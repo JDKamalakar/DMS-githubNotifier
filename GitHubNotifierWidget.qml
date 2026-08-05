@@ -29,6 +29,11 @@ PluginComponent {
     property bool showPRs: asBool(pluginData.showPRs, true)
     property bool showIssues: asBool(pluginData.showIssues, true)
 
+    // Proc.runCommand() is a singleton keyed by id, so two widget instances
+    // (one per bar/monitor) sharing an id clobber each other's callback and
+    // only the last registered one ever fires. Namespace ids per instance.
+    readonly property string procNs: "githubNotifier." + Math.floor(Math.random() * 1000000000) + "."
+
     // State
     property bool loading: false
     property bool refreshPending: false
@@ -54,6 +59,20 @@ PluginComponent {
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refresh()
+    }
+
+    // If a Proc callback never fires, `loading` would latch true forever and
+    // refresh() would early-return for the rest of the session ("Checking...").
+    Timer {
+        id: loadingWatchdog
+        interval: 30000
+        repeat: false
+        running: root.loading
+        onTriggered: {
+            root.refreshPending = false;
+            root.loading = false;
+            root.setError("Timed out talking to gh. Will retry.");
+        }
     }
 
     onGhBinaryChanged: refresh()
@@ -104,7 +123,7 @@ PluginComponent {
         root.authOk = true;
 
         // 1) Check gh is installed
-        Proc.runCommand("githubNotifier.ghVersion", [root.ghBinary, "--version"], (stdout, exitCode) => {
+        Proc.runCommand(root.procNs + "ghVersion", [root.ghBinary, "--version"], (stdout, exitCode) => {
             if (exitCode !== 0) {
                 root.ghOk = false;
                 root.authOk = false;
@@ -116,7 +135,7 @@ PluginComponent {
             }
 
             // 2) Check auth
-            Proc.runCommand("githubNotifier.authStatus", [root.ghBinary, "auth", "status"], (authOut, authExit) => {
+            Proc.runCommand(root.procNs + "authStatus", [root.ghBinary, "auth", "status"], (authOut, authExit) => {
                 if (authExit !== 0) {
                     root.authOk = false;
                     root.prCount = 0;
@@ -127,7 +146,7 @@ PluginComponent {
                 }
 
                 if (!root.profileUrl) {
-                    Proc.runCommand("githubNotifier.getProfile", [root.ghBinary, "api", "user", "--jq", "{html_url,avatar_url,login}"], (pOut, pExit) => {
+                    Proc.runCommand(root.procNs + "getProfile", [root.ghBinary, "api", "user", "--jq", "{html_url,avatar_url,login}"], (pOut, pExit) => {
                         if (pExit === 0) {
                             try {
                                 const u = JSON.parse(pOut.trim());
@@ -207,7 +226,7 @@ PluginComponent {
         };
 
         if (root.showPRs) {
-            Proc.runCommand("githubNotifier.prList", prArgs(), (stdout, exitCode) => {
+            Proc.runCommand(root.procNs + "prList", prArgs(), (stdout, exitCode) => {
                 if (exitCode === 0) {
                     root.prList = parseGitHubList(stdout);
                     root.prCount = root.prList.length;
@@ -217,7 +236,7 @@ PluginComponent {
         }
 
         if (root.showIssues) {
-            Proc.runCommand("githubNotifier.issueList", issueArgs(), (stdout, exitCode) => {
+            Proc.runCommand(root.procNs + "issueList", issueArgs(), (stdout, exitCode) => {
                 if (exitCode === 0) {
                     root.issueList = parseGitHubList(stdout);
                     root.issuesCount = root.issueList.length;
