@@ -29,14 +29,12 @@ PluginComponent {
     property bool showPRs: asBool(pluginData.showPRs, true)
     property bool showIssues: asBool(pluginData.showIssues, true)
 
-    // Proc.runCommand() is a singleton keyed by id, so two widget instances
-    // (one per bar/monitor) sharing an id clobber each other's callback and
-    // only the last registered one ever fires. Namespace ids per instance.
-    readonly property string procNs: "githubNotifier." + Math.floor(Math.random() * 1000000000) + "."
-
     // State
     property bool loading: false
     property bool refreshPending: false
+    // Bumped on every refresh() so callbacks from an abandoned cycle (watchdog
+    // timeout, overlapping refresh) can be discarded instead of completing it.
+    property int refreshEpoch: 0
     property string lastError: ""
     property bool ghOk: true
     property bool authOk: true
@@ -63,12 +61,15 @@ PluginComponent {
 
     // If a Proc callback never fires, `loading` would latch true forever and
     // refresh() would early-return for the rest of the session ("Checking...").
+    // 60s is above the worst legitimate case: ghVersion, authStatus and the
+    // count queries each carry a 10s Proc timeout and run back to back.
     Timer {
         id: loadingWatchdog
-        interval: 30000
+        interval: 60000
         repeat: false
         running: root.loading
         onTriggered: {
+            root.refreshEpoch++;
             root.refreshPending = false;
             root.loading = false;
             root.setError("Timed out talking to gh. Will retry.");
@@ -118,12 +119,22 @@ PluginComponent {
         }
 
         root.loading = true;
+        const gen = ++root.refreshEpoch;
         root.setError("");
         root.ghOk = true;
         root.authOk = true;
 
+        // Proc.runCommand() is a singleton that keeps one entry per id and reads
+        // entry.callback at completion time, so two widget instances (one per
+        // bar/monitor) sharing an id clobber each other and only the last one
+        // registered ever fires. A null id makes Proc mint a private id per call
+        // and drop the entry once it completes.
+
         // 1) Check gh is installed
-        Proc.runCommand(root.procNs + "ghVersion", [root.ghBinary, "--version"], (stdout, exitCode) => {
+        Proc.runCommand(null, [root.ghBinary, "--version"], (stdout, exitCode) => {
+            if (gen !== root.refreshEpoch)
+                return;
+
             if (exitCode !== 0) {
                 root.ghOk = false;
                 root.authOk = false;
@@ -135,7 +146,10 @@ PluginComponent {
             }
 
             // 2) Check auth
-            Proc.runCommand(root.procNs + "authStatus", [root.ghBinary, "auth", "status"], (authOut, authExit) => {
+            Proc.runCommand(null, [root.ghBinary, "auth", "status"], (authOut, authExit) => {
+                if (gen !== root.refreshEpoch)
+                    return;
+
                 if (authExit !== 0) {
                     root.authOk = false;
                     root.prCount = 0;
@@ -145,8 +159,11 @@ PluginComponent {
                     return;
                 }
 
+                // Fire and forget: it does not touch `loading`, and the profile
+                // stays valid even if the refresh it belongs to was abandoned,
+                // so it deliberately skips the epoch check.
                 if (!root.profileUrl) {
-                    Proc.runCommand(root.procNs + "getProfile", [root.ghBinary, "api", "user", "--jq", "{html_url,avatar_url,login}"], (pOut, pExit) => {
+                    Proc.runCommand(null, [root.ghBinary, "api", "user", "--jq", "{html_url,avatar_url,login}"], (pOut, pExit) => {
                         if (pExit === 0) {
                             try {
                                 const u = JSON.parse(pOut.trim());
@@ -158,7 +175,7 @@ PluginComponent {
                     }, 0, 10000);
                 }
 
-                root.fetchCounts();
+                root.fetchCounts(gen);
 
             }, 0, 10000);
         }, 0, 10000);
@@ -191,7 +208,7 @@ PluginComponent {
     }
 
 
-    function fetchCounts() {
+    function fetchCounts(gen) {
         const o = (root.org || "").trim();
 
         function prArgs() {
@@ -226,7 +243,10 @@ PluginComponent {
         };
 
         if (root.showPRs) {
-            Proc.runCommand(root.procNs + "prList", prArgs(), (stdout, exitCode) => {
+            Proc.runCommand(null, prArgs(), (stdout, exitCode) => {
+                if (gen !== root.refreshEpoch)
+                    return;
+
                 if (exitCode === 0) {
                     root.prList = parseGitHubList(stdout);
                     root.prCount = root.prList.length;
@@ -236,7 +256,10 @@ PluginComponent {
         }
 
         if (root.showIssues) {
-            Proc.runCommand(root.procNs + "issueList", issueArgs(), (stdout, exitCode) => {
+            Proc.runCommand(null, issueArgs(), (stdout, exitCode) => {
+                if (gen !== root.refreshEpoch)
+                    return;
+
                 if (exitCode === 0) {
                     root.issueList = parseGitHubList(stdout);
                     root.issuesCount = root.issueList.length;
