@@ -571,135 +571,169 @@ PluginComponent {
                                 }
                             }
 
-                            // Items Column with Dynamic Heights and Morphing Corner Cards
-                            Column {
+                            // Friend/PR list container (Scrollable if > 3 items)
+                            Item {
                                 width: parent.width
-                                spacing: 4
+                                height: root.prList.length > 3 ? 166 : prItemsColumn.implicitHeight
                                 visible: !root.isRefreshing && root.prList.length > 0
 
-                                Repeater {
-                                    model: root.prList
+                                ScrollView {
+                                    id: prScrollView
+                                    anchors.fill: parent
+                                    contentWidth: availableWidth
 
-                                    delegate: Item {
-                                        id: prDelegate
-                                        width: parent.width
-                                        height: Math.max(56, prRowLayout.implicitHeight + Theme.spacingS * 2)
+                                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                    ScrollBar.vertical: ScrollBar {
+                                        id: prScrollBar
+                                        policy: root.prList.length > 3 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                                        active: true
+                                        width: 6
 
-                                        property bool isHovered: prMa.containsMouse
-
-                                        Shape {
-                                            id: prBg
-                                            anchors.fill: parent
-
-                                            property real innerRadius: 6
-                                            property real outerRadius: Theme.cornerRadius || 12
-                                            property bool isFirst: index === 0
-                                            property bool isLast: index === root.prList.length - 1
-
-                                            property real tlr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
-                                            property real trr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
-                                            property real blr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
-                                            property real brr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
-
-                                            property real tlrAnim: tlr; Behavior on tlrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                                            property real trrAnim: trr; Behavior on trrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                                            property real blrAnim: blr; Behavior on blrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                                            property real brrAnim: brr; Behavior on brrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-
-                                            property color paintColor: isHovered
-                                                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.1)
-                                                    : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.04)
-
-                                            property color paintBorder: isHovered
-                                                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4)
-                                                    : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.15)
-
-                                            ShapePath {
-                                                fillColor: prBg.paintColor
-                                                strokeColor: prBg.paintBorder
-                                                strokeWidth: 1
-
-                                                startX: prBg.tlrAnim; startY: 0
-                                                PathLine { x: prBg.width - prBg.trrAnim; y: 0 }
-                                                PathArc { x: prBg.width; y: prBg.trrAnim; radiusX: prBg.trrAnim; radiusY: prBg.trrAnim; direction: PathArc.Clockwise }
-                                                PathLine { x: prBg.width; y: prBg.height - prBg.brrAnim }
-                                                PathArc { x: prBg.width - prBg.brrAnim; y: prBg.height; radiusX: prBg.brrAnim; radiusY: prBg.brrAnim; direction: PathArc.Clockwise }
-                                                PathLine { x: prBg.blrAnim; y: prBg.height }
-                                                PathArc { x: 0; y: prBg.height - prBg.blrAnim; radiusX: prBg.blrAnim; radiusY: prBg.blrAnim; direction: PathArc.Clockwise }
-                                                PathLine { x: 0; y: prBg.tlrAnim }
-                                                PathArc { x: prBg.tlrAnim; y: 0; radiusX: prBg.tlrAnim; radiusY: prBg.tlrAnim; direction: PathArc.Clockwise }
-                                            }
+                                        contentItem: Rectangle {
+                                            implicitWidth: 6
+                                            radius: 3
+                                            color: prScrollBar.pressed 
+                                                   ? Theme.primary 
+                                                   : (prScrollBar.hovered 
+                                                      ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.7) 
+                                                      : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4))
+                                            Behavior on color { ColorAnimation { duration: 150 } }
                                         }
 
-                                        scale: prMa.pressed ? 0.98 : (isHovered ? 1.01 : 1.0)
-                                        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
-
-                                        DankRipple {
-                                            id: prRip
-                                            anchors.fill: parent
-                                            cornerRadius: prBg.tlrAnim
-                                            rippleColor: Theme.primary
+                                        background: Rectangle {
+                                            implicitWidth: 6
+                                            color: Qt.rgba(Theme.surfaceContainer.r, Theme.surfaceContainer.g, Theme.surfaceContainer.b, 0.2)
+                                            radius: 3
                                         }
+                                    }
 
-                                        RowLayout {
-                                            id: prRowLayout
-                                            anchors.left: parent.left
-                                            anchors.right: parent.right
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.leftMargin: Theme.spacingM
-                                            anchors.rightMargin: Theme.spacingM
-                                            spacing: Theme.spacingM
+                                    Column {
+                                        id: prItemsColumn
+                                        width: prScrollView.availableWidth
+                                        spacing: 4
 
-                                            DankIcon {
-                                                name: "merge_type"
-                                                size: 18
-                                                color: Theme.primary
-                                                Layout.alignment: Qt.AlignVCenter
-                                            }
+                                        Repeater {
+                                            model: root.prList
 
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                Layout.alignment: Qt.AlignVCenter
-                                                spacing: 2
+                                            delegate: Item {
+                                                id: prDelegate
+                                                width: parent.width
+                                                height: Math.max(56, prRowLayout.implicitHeight + Theme.spacingS * 2)
 
-                                                StyledText {
-                                                    text: modelData.title || ""
-                                                    font.pixelSize: Theme.fontSizeMedium
-                                                    font.weight: Font.Medium
-                                                    color: Theme.surfaceText
-                                                    Layout.fillWidth: true
-                                                    wrapMode: Text.WordWrap
-                                                    maximumLineCount: 2
-                                                    elide: Text.ElideRight
+                                                property bool isHovered: prMa.containsMouse
+
+                                                Shape {
+                                                    id: prBg
+                                                    anchors.fill: parent
+
+                                                    property real innerRadius: 6
+                                                    property real outerRadius: Theme.cornerRadius || 12
+                                                    property bool isFirst: index === 0
+                                                    property bool isLast: index === root.prList.length - 1
+
+                                                    property real tlr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
+                                                    property real trr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
+                                                    property real blr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
+                                                    property real brr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
+
+                                                    property real tlrAnim: tlr; Behavior on tlrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                                                    property real trrAnim: trr; Behavior on trrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                                                    property real blrAnim: blr; Behavior on blrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                                                    property real brrAnim: brr; Behavior on brrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+
+                                                    property color paintColor: isHovered
+                                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.1)
+                                                            : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.04)
+
+                                                    property color paintBorder: isHovered
+                                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4)
+                                                            : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.15)
+
+                                                    ShapePath {
+                                                        fillColor: prBg.paintColor
+                                                        strokeColor: prBg.paintBorder
+                                                        strokeWidth: 1
+
+                                                        startX: prBg.tlrAnim + 1; startY: 1
+                                                        PathLine { x: prBg.width - prBg.trrAnim - 1; y: 1 }
+                                                        PathArc { x: prBg.width - 1; y: prBg.trrAnim + 1; radiusX: prBg.trrAnim; radiusY: prBg.trrAnim; direction: PathArc.Clockwise }
+                                                        PathLine { x: prBg.width - 1; y: prBg.height - prBg.brrAnim - 1 }
+                                                        PathArc { x: prBg.width - prBg.brrAnim - 1; y: prBg.height - 1; radiusX: prBg.brrAnim; radiusY: prBg.brrAnim; direction: PathArc.Clockwise }
+                                                        PathLine { x: prBg.blrAnim + 1; y: prBg.height - 1 }
+                                                        PathArc { x: 1; y: prBg.height - prBg.blrAnim - 1; radiusX: prBg.blrAnim; radiusY: prBg.blrAnim; direction: PathArc.Clockwise }
+                                                        PathLine { x: 1; y: prBg.tlrAnim + 1 }
+                                                        PathArc { x: prBg.tlrAnim + 1; y: 1; radiusX: prBg.tlrAnim; radiusY: prBg.tlrAnim; direction: PathArc.Clockwise }
+                                                    }
                                                 }
 
-                                                StyledText {
-                                                    text: (modelData.repository ? (modelData.repository.nameWithOwner || modelData.repository.name) : "") + " #" + modelData.number
-                                                    font.pixelSize: Theme.fontSizeSmall
-                                                    color: isHovered ? Theme.primary : Theme.surfaceVariantText
-                                                    Layout.fillWidth: true
-                                                    elide: Text.ElideRight
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                DankRipple {
+                                                    id: prRip
+                                                    anchors.fill: parent
+                                                    cornerRadius: prBg.tlrAnim
+                                                    rippleColor: Theme.primary
+                                                }
+
+                                                RowLayout {
+                                                    id: prRowLayout
+                                                    anchors.left: parent.left
+                                                    anchors.right: parent.right
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.leftMargin: Theme.spacingM
+                                                    anchors.rightMargin: Theme.spacingM
+                                                    spacing: Theme.spacingM
+
+                                                    DankIcon {
+                                                        name: "merge_type"
+                                                        size: 18
+                                                        color: Theme.primary
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                    }
+
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                        spacing: 2
+
+                                                        StyledText {
+                                                            text: modelData.title || ""
+                                                            font.pixelSize: Theme.fontSizeMedium
+                                                            font.weight: Font.Medium
+                                                            color: Theme.surfaceText
+                                                            Layout.fillWidth: true
+                                                            wrapMode: Text.WordWrap
+                                                            maximumLineCount: 2
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        StyledText {
+                                                            text: (modelData.repository ? (modelData.repository.nameWithOwner || modelData.repository.name) : "") + " #" + modelData.number
+                                                            font.pixelSize: Theme.fontSizeSmall
+                                                            color: isHovered ? Theme.primary : Theme.surfaceVariantText
+                                                            Layout.fillWidth: true
+                                                            elide: Text.ElideRight
+                                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                                        }
+                                                    }
+
+                                                    DankIcon {
+                                                        name: "open_in_new"
+                                                        size: 16
+                                                        color: Theme.surfaceVariantText
+                                                        opacity: isHovered ? 0.9 : 0.0
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: prMa
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onPressed: (m) => prRip.trigger(m.x, m.y)
+                                                    onClicked: root.openUrl(modelData.url)
                                                 }
                                             }
-
-                                            DankIcon {
-                                                name: "open_in_new"
-                                                size: 16
-                                                color: Theme.surfaceVariantText
-                                                opacity: isHovered ? 0.9 : 0.0
-                                                Layout.alignment: Qt.AlignVCenter
-                                                Behavior on opacity { NumberAnimation { duration: 150 } }
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: prMa
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onPressed: (m) => prRip.trigger(m.x, m.y)
-                                            onClicked: root.openUrl(modelData.url)
                                         }
                                     }
                                 }
@@ -836,135 +870,169 @@ PluginComponent {
                                 }
                             }
 
-                            // Items Column with Dynamic Heights and Morphing Corner Cards
-                            Column {
+                            // Issue list container (Scrollable if > 3 items)
+                            Item {
                                 width: parent.width
-                                spacing: 4
+                                height: root.issueList.length > 3 ? 166 : issueItemsColumn.implicitHeight
                                 visible: !root.isRefreshing && root.issueList.length > 0
 
-                                Repeater {
-                                    model: root.issueList
+                                ScrollView {
+                                    id: issueScrollView
+                                    anchors.fill: parent
+                                    contentWidth: availableWidth
 
-                                    delegate: Item {
-                                        id: issueDelegate
-                                        width: parent.width
-                                        height: Math.max(56, issueRowLayout.implicitHeight + Theme.spacingS * 2)
+                                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                                    ScrollBar.vertical: ScrollBar {
+                                        id: issueScrollBar
+                                        policy: root.issueList.length > 3 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                                        active: true
+                                        width: 6
 
-                                        property bool isHovered: issueMa.containsMouse
-
-                                        Shape {
-                                            id: issueBg
-                                            anchors.fill: parent
-
-                                            property real innerRadius: 6
-                                            property real outerRadius: Theme.cornerRadius || 12
-                                            property bool isFirst: index === 0
-                                            property bool isLast: index === root.issueList.length - 1
-
-                                            property real tlr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
-                                            property real trr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
-                                            property real blr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
-                                            property real brr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
-
-                                            property real tlrAnim: tlr; Behavior on tlrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                                            property real trrAnim: trr; Behavior on trrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                                            property real blrAnim: blr; Behavior on blrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-                                            property real brrAnim: brr; Behavior on brrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
-
-                                            property color paintColor: isHovered
-                                                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.1)
-                                                    : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.04)
-
-                                            property color paintBorder: isHovered
-                                                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4)
-                                                    : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.15)
-
-                                            ShapePath {
-                                                fillColor: issueBg.paintColor
-                                                strokeColor: issueBg.paintBorder
-                                                strokeWidth: 1
-
-                                                startX: issueBg.tlrAnim; startY: 0
-                                                PathLine { x: issueBg.width - issueBg.trrAnim; y: 0 }
-                                                PathArc { x: issueBg.width; y: issueBg.trrAnim; radiusX: issueBg.trrAnim; radiusY: issueBg.trrAnim; direction: PathArc.Clockwise }
-                                                PathLine { x: issueBg.width; y: issueBg.height - issueBg.brrAnim }
-                                                PathArc { x: issueBg.width - issueBg.brrAnim; y: issueBg.height; radiusX: issueBg.brrAnim; radiusY: issueBg.brrAnim; direction: PathArc.Clockwise }
-                                                PathLine { x: issueBg.blrAnim; y: issueBg.height }
-                                                PathArc { x: 0; y: issueBg.height - issueBg.blrAnim; radiusX: issueBg.blrAnim; radiusY: issueBg.blrAnim; direction: PathArc.Clockwise }
-                                                PathLine { x: 0; y: issueBg.tlrAnim }
-                                                PathArc { x: issueBg.tlrAnim; y: 0; radiusX: issueBg.tlrAnim; radiusY: issueBg.tlrAnim; direction: PathArc.Clockwise }
-                                            }
+                                        contentItem: Rectangle {
+                                            implicitWidth: 6
+                                            radius: 3
+                                            color: issueScrollBar.pressed 
+                                                   ? Theme.primary 
+                                                   : (issueScrollBar.hovered 
+                                                      ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.7) 
+                                                      : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4))
+                                            Behavior on color { ColorAnimation { duration: 150 } }
                                         }
 
-                                        scale: issueMa.pressed ? 0.98 : (isHovered ? 1.01 : 1.0)
-                                        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
-
-                                        DankRipple {
-                                            id: issueRip
-                                            anchors.fill: parent
-                                            cornerRadius: issueBg.tlrAnim
-                                            rippleColor: Theme.primary
+                                        background: Rectangle {
+                                            implicitWidth: 6
+                                            color: Qt.rgba(Theme.surfaceContainer.r, Theme.surfaceContainer.g, Theme.surfaceContainer.b, 0.2)
+                                            radius: 3
                                         }
+                                    }
 
-                                        RowLayout {
-                                            id: issueRowLayout
-                                            anchors.left: parent.left
-                                            anchors.right: parent.right
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.leftMargin: Theme.spacingM
-                                            anchors.rightMargin: Theme.spacingM
-                                            spacing: Theme.spacingM
+                                    Column {
+                                        id: issueItemsColumn
+                                        width: issueScrollView.availableWidth
+                                        spacing: 4
 
-                                            DankIcon {
-                                                name: "bug_report"
-                                                size: 18
-                                                color: Theme.secondary
-                                                Layout.alignment: Qt.AlignVCenter
-                                            }
+                                        Repeater {
+                                            model: root.issueList
 
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                Layout.alignment: Qt.AlignVCenter
-                                                spacing: 2
+                                            delegate: Item {
+                                                id: issueDelegate
+                                                width: parent.width
+                                                height: Math.max(56, issueRowLayout.implicitHeight + Theme.spacingS * 2)
 
-                                                StyledText {
-                                                    text: modelData.title || ""
-                                                    font.pixelSize: Theme.fontSizeMedium
-                                                    font.weight: Font.Medium
-                                                    color: Theme.surfaceText
-                                                    Layout.fillWidth: true
-                                                    wrapMode: Text.WordWrap
-                                                    maximumLineCount: 2
-                                                    elide: Text.ElideRight
+                                                property bool isHovered: issueMa.containsMouse
+
+                                                Shape {
+                                                    id: issueBg
+                                                    anchors.fill: parent
+
+                                                    property real innerRadius: 6
+                                                    property real outerRadius: Theme.cornerRadius || 12
+                                                    property bool isFirst: index === 0
+                                                    property bool isLast: index === root.issueList.length - 1
+
+                                                    property real tlr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
+                                                    property real trr: isHovered ? (height / 2) : (isFirst ? outerRadius : innerRadius)
+                                                    property real blr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
+                                                    property real brr: isHovered ? (height / 2) : (isLast ? outerRadius : innerRadius)
+
+                                                    property real tlrAnim: tlr; Behavior on tlrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                                                    property real trrAnim: trr; Behavior on trrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                                                    property real blrAnim: blr; Behavior on blrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+                                                    property real brrAnim: brr; Behavior on brrAnim { NumberAnimation { duration: 600; easing.type: Easing.OutExpo } }
+
+                                                    property color paintColor: isHovered
+                                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.1)
+                                                            : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.04)
+
+                                                    property color paintBorder: isHovered
+                                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.4)
+                                                            : Qt.rgba(Theme.secondary.r, Theme.secondary.g, Theme.secondary.b, 0.15)
+
+                                                    ShapePath {
+                                                        fillColor: issueBg.paintColor
+                                                        strokeColor: issueBg.paintBorder
+                                                        strokeWidth: 1
+
+                                                        startX: issueBg.tlrAnim + 1; startY: 1
+                                                        PathLine { x: issueBg.width - issueBg.trrAnim - 1; y: 1 }
+                                                        PathArc { x: issueBg.width - 1; y: issueBg.trrAnim + 1; radiusX: issueBg.trrAnim; radiusY: issueBg.trrAnim; direction: PathArc.Clockwise }
+                                                        PathLine { x: issueBg.width - 1; y: issueBg.height - issueBg.brrAnim - 1 }
+                                                        PathArc { x: issueBg.width - issueBg.brrAnim - 1; y: issueBg.height - 1; radiusX: issueBg.brrAnim; radiusY: issueBg.brrAnim; direction: PathArc.Clockwise }
+                                                        PathLine { x: issueBg.blrAnim + 1; y: issueBg.height - 1 }
+                                                        PathArc { x: 1; y: issueBg.height - issueBg.blrAnim - 1; radiusX: issueBg.blrAnim; radiusY: issueBg.blrAnim; direction: PathArc.Clockwise }
+                                                        PathLine { x: 1; y: issueBg.tlrAnim + 1 }
+                                                        PathArc { x: issueBg.tlrAnim + 1; y: 1; radiusX: issueBg.tlrAnim; radiusY: issueBg.tlrAnim; direction: PathArc.Clockwise }
+                                                    }
                                                 }
 
-                                                StyledText {
-                                                    text: (modelData.repository ? (modelData.repository.nameWithOwner || modelData.repository.name) : "") + " #" + modelData.number
-                                                    font.pixelSize: Theme.fontSizeSmall
-                                                    color: isHovered ? Theme.primary : Theme.surfaceVariantText
-                                                    Layout.fillWidth: true
-                                                    elide: Text.ElideRight
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                DankRipple {
+                                                    id: issueRip
+                                                    anchors.fill: parent
+                                                    cornerRadius: issueBg.tlrAnim
+                                                    rippleColor: Theme.primary
+                                                }
+
+                                                RowLayout {
+                                                    id: issueRowLayout
+                                                    anchors.left: parent.left
+                                                    anchors.right: parent.right
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.leftMargin: Theme.spacingM
+                                                    anchors.rightMargin: Theme.spacingM
+                                                    spacing: Theme.spacingM
+
+                                                    DankIcon {
+                                                        name: "bug_report"
+                                                        size: 18
+                                                        color: Theme.secondary
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                    }
+
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                        spacing: 2
+
+                                                        StyledText {
+                                                            text: modelData.title || ""
+                                                            font.pixelSize: Theme.fontSizeMedium
+                                                            font.weight: Font.Medium
+                                                            color: Theme.surfaceText
+                                                            Layout.fillWidth: true
+                                                            wrapMode: Text.WordWrap
+                                                            maximumLineCount: 2
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        StyledText {
+                                                            text: (modelData.repository ? (modelData.repository.nameWithOwner || modelData.repository.name) : "") + " #" + modelData.number
+                                                            font.pixelSize: Theme.fontSizeSmall
+                                                            color: isHovered ? Theme.primary : Theme.surfaceVariantText
+                                                            Layout.fillWidth: true
+                                                            elide: Text.ElideRight
+                                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                                        }
+                                                    }
+
+                                                    DankIcon {
+                                                        name: "open_in_new"
+                                                        size: 16
+                                                        color: Theme.surfaceVariantText
+                                                        opacity: isHovered ? 0.9 : 0.0
+                                                        Layout.alignment: Qt.AlignVCenter
+                                                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: issueMa
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onPressed: (m) => issueRip.trigger(m.x, m.y)
+                                                    onClicked: root.openUrl(modelData.url)
                                                 }
                                             }
-
-                                            DankIcon {
-                                                name: "open_in_new"
-                                                size: 16
-                                                color: Theme.surfaceVariantText
-                                                opacity: isHovered ? 0.9 : 0.0
-                                                Layout.alignment: Qt.AlignVCenter
-                                                Behavior on opacity { NumberAnimation { duration: 150 } }
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: issueMa
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onPressed: (m) => issueRip.trigger(m.x, m.y)
-                                            onClicked: root.openUrl(modelData.url)
                                         }
                                     }
                                 }
